@@ -7,8 +7,10 @@ import SearchField from "../components/ui/SearchField";
 export default function PublicCatalog({ products, onOpenAdmin }) {
   const [category, setCategory] = useState("Semua");
   const [search, setSearch] = useState("");
+
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+
   const [toastMsg, setToastMsg] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -48,7 +50,14 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
         .map((item) => {
           if (item.id === id) {
             const newQty = item.qty + delta;
-            return newQty > 0 ? { ...item, qty: newQty } : item;
+
+            if (delta > 0 && newQty > item.stock) {
+              setToastMsg(`Stok ${item.name} sisa ${item.stock} porsi`);
+              setTimeout(() => setToastMsg(null), 2000);
+              return item;
+            }
+
+            return { ...item, qty: newQty };
           }
           return item;
         })
@@ -66,7 +75,7 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
       text += `${index + 1}. ${item.name} (${item.qty}x) - Rp${(item.price * item.qty).toLocaleString("id-ID")}\n`;
     });
     text += `\n*Total Belanja: Rp${totalPrice.toLocaleString("id-ID")}*\n\nMohon info total ongkir dan pembayarannya ya. Terima kasih!`;
-    const waNumber = "6281234567890";
+    const waNumber = "628123456789";
     window.open(
       `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`,
       "_blank",
@@ -76,8 +85,9 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
   return (
     <div className="min-h-screen bg-canvas text-ink relative">
       <header className="sticky top-0 z-30 border-b border-line/80 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center gap-6 px-5 py-4 lg:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-5 py-4 lg:px-8">
           <Brand />
+
           <div className="mx-auto hidden max-w-xl flex-1 md:block">
             <SearchField onChange={setSearch} value={search} />
           </div>
@@ -114,14 +124,6 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
                 </span>
               </>
             )}
-          </Button>
-
-          <Button
-            className="size-11 shrink-0"
-            onClick={onOpenAdmin}
-            variant="ghost"
-          >
-            <Icon name="menu" className="size-5" />
           </Button>
         </div>
       </header>
@@ -184,57 +186,117 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
             </div>
           </div>
 
-          <div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {visibleProducts.map((product) => (
-              <article
-                className="flex flex-col group overflow-hidden rounded-3xl border border-line bg-white p-3 shadow-sm transition hover:shadow-md hover:border-brand/30"
-                key={product.id}
-              >
-                <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-gray-100">
-                  <img
-                    alt={product.name}
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                    src={product.image}
-                  />
-                  <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-ink backdrop-blur">
-                    {product.category}
-                  </span>
-                  {!product.available && (
-                    <span className="absolute inset-0 grid place-items-center bg-black/50 text-sm font-bold uppercase tracking-widest text-white backdrop-blur-sm">
-                      Habis
+          <div className="mt-9 grid gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+            {visibleProducts.map((product) => {
+              const cartItem = cart.find((item) => item.id === product.id);
+
+              return (
+                <article
+                  className="flex flex-col group overflow-hidden rounded-3xl border border-line bg-white p-3 shadow-sm transition hover:shadow-md hover:border-brand/30"
+                  key={product.id}
+                >
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-gray-100">
+                    <img
+                      alt={product.name}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      src={product.image}
+                    />
+                    <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-ink backdrop-blur">
+                      {product.category}
                     </span>
-                  )}
-                </div>
-                <div className="flex flex-col flex-1 px-2 pb-2 pt-4">
-                  <h3 className="text-lg font-extrabold text-ink">
-                    {product.name}
-                  </h3>
-                  <p className="mt-2 line-clamp-2 text-sm leading-5 text-muted flex-1">
-                    {product.description}
-                  </p>
-                  <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
-                    <strong className="block text-lg text-brand">
-                      Rp{product.price.toLocaleString("id-ID")}
-                    </strong>
-                    <Button
-                      className="px-4 py-2 text-sm"
-                      onClick={() => addToCart(product)}
-                      disabled={!product.available}
-                    >
-                      +
-                    </Button>
+                    {(!product.available || product.stock === 0) && (
+                      <span className="absolute inset-0 grid place-items-center bg-black/50 text-sm font-bold uppercase tracking-widest text-white backdrop-blur-sm">
+                        Habis
+                      </span>
+                    )}
                   </div>
-                </div>
-              </article>
-            ))}
+                  <div className="flex flex-col flex-1 px-2 pb-2 pt-4">
+                    <h3 className="text-lg font-extrabold text-ink">
+                      {product.name}
+                    </h3>
+                    <p className="mt-2 line-clamp-2 text-sm leading-5 text-muted flex-1">
+                      {product.description}
+                    </p>
+                    <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
+                      <div>
+                        <strong className="block text-lg text-brand">
+                          Rp{product.price.toLocaleString("id-ID")}
+                        </strong>
+                        {/* <span className="mt-0.5 block text-xs font-medium text-muted">
+                          Sisa stok:{" "}
+                          <span className="font-bold text-ink">
+                            {product.stock}
+                          </span>
+                        </span> */}
+                      </div>
+
+                      {cartItem ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => updateQty(product.id, -1)}
+                            className={`flex size-8 items-center justify-center rounded-lg border font-bold transition ${
+                              cartItem.qty === 1
+                                ? "border-red-200 bg-red-50 text-red-500 hover:bg-red-100"
+                                : "border-line bg-surface hover:bg-gray-100 text-ink"
+                            }`}
+                          >
+                            {cartItem.qty === 1 ? (
+                              <Icon name="trash" className="size-4" />
+                            ) : (
+                              "-"
+                            )}
+                          </button>
+
+                          <span className="text-sm font-bold w-5 text-center">
+                            {cartItem.qty}
+                          </span>
+
+                          <button
+                            onClick={() => updateQty(product.id, 1)}
+                            disabled={cartItem.qty >= product.stock}
+                            className={`flex size-8 items-center justify-center rounded-lg border font-bold transition ${
+                              cartItem.qty >= product.stock
+                                ? "border-line bg-gray-100 text-gray-400 cursor-not-allowed"
+                                : "border-brand bg-brand text-white hover:bg-brand-dark"
+                            }`}
+                          >
+                            +
+                          </button>
+                        </div>
+                      ) : (
+                        <Button
+                          className="px-4 py-2 text-sm"
+                          onClick={() => addToCart(product)}
+                          disabled={!product.available || product.stock === 0}
+                        >
+                          {product.stock === 0 ? "Habis" : "+ Tambah"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </section>
+
+        <footer className="border-t border-line mt-10 py-8 text-center">
+          <p className="text-sm text-muted">
+            © 2026 Raisaku. Dibuat dengan sepenuh hati.
+          </p>
+          <button
+            onClick={onOpenAdmin}
+            className="mt-3 text-xs font-bold text-gray-300 hover:text-brand transition duration-300"
+          >
+            Admin Access
+          </button>
+        </footer>
       </main>
 
       {toastMsg && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50">
           <div className="animate-bounce bg-ink text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 font-bold text-sm whitespace-nowrap">
-            <span className="bg-emerald-500 rounded-full p-1">
+            <span className="bg-green-500 rounded-full p-1">
               <svg
                 className="w-4 h-4 text-white"
                 fill="none"
@@ -261,7 +323,6 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
           className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isCartOpen ? "opacity-100" : "opacity-0"}`}
           onClick={() => setIsCartOpen(false)}
         />
-
         <div
           className={`absolute inset-y-0 right-0 flex max-w-full w-full sm:w-[400px] transform transition-transform duration-300 ease-in-out ${isCartOpen ? "translate-x-0" : "translate-x-full"}`}
         >
@@ -275,7 +336,6 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
                 <Icon name="close" className="size-5" />
               </button>
             </div>
-
             <div className="flex-1 overflow-y-auto p-6">
               {cart.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center text-muted">
@@ -327,7 +387,12 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
                           </span>
                           <button
                             onClick={() => updateQty(item.id, 1)}
-                            className="flex size-7 items-center justify-center rounded-lg border border-line bg-gray-50 hover:bg-gray-100 font-bold text-ink"
+                            disabled={item.qty >= item.stock}
+                            className={`flex size-7 items-center justify-center rounded-lg border font-bold transition ${
+                              item.qty >= item.stock
+                                ? "border-line bg-gray-100 text-gray-300 cursor-not-allowed"
+                                : "border-line bg-gray-50 hover:bg-gray-200 text-ink"
+                            }`}
                           >
                             +
                           </button>
@@ -343,7 +408,6 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
                 </ul>
               )}
             </div>
-
             {cart.length > 0 && (
               <div className="border-t border-line bg-gray-50 p-6">
                 <div className="flex justify-between text-base font-bold text-ink mb-5">

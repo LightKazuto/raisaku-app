@@ -10,7 +10,7 @@ export default function App() {
 
   const fetchProducts = async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/products");
+      const response = await axios.get("http://localhost:5001/api/products");
 
       const formattedData = response.data.data.map((item) => ({
         id: item.id,
@@ -23,6 +23,7 @@ export default function App() {
         price: item.price,
         image: item.image,
         available: item.is_available ?? true,
+        stock: item.qty || 0,
       }));
 
       setProducts(formattedData);

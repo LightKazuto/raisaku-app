@@ -21,7 +21,7 @@ export default function AddProductModal({ onClose, onSave }) {
     }
 
     try {
-      await axios.post("http://localhost:5000/api/products", formData, {
+      await axios.post("http://localhost:5001/api/products", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       onSave();

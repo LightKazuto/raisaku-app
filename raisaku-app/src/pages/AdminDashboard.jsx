@@ -1,4 +1,5 @@
 import { useState } from "react";
+import axios from "axios";
 import Brand from "../components/ui/Brand";
 import Button from "../components/ui/Button";
 import Icon from "../components/ui/Icon";
@@ -24,6 +25,24 @@ export default function AdminDashboard({
     ["box", "Produk"],
     ["tag", "Kategori"],
   ];
+
+  const handleToggleStatus = async (productId, currentStatus) => {
+    setProducts(
+      products.map((item) =>
+        item.id === productId ? { ...item, available: !currentStatus } : item,
+      ),
+    );
+
+    try {
+      await axios.put(`http://localhost:5001/api/products/${productId}`, {
+        is_available: !currentStatus,
+      });
+    } catch (error) {
+      console.error("Gagal mengubah status ketersediaan:", error);
+      alert("Terjadi kesalahan saat mengubah status produk.");
+      refreshProducts();
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-ink flex">
@@ -129,15 +148,12 @@ export default function AdminDashboard({
                           <div className="flex items-center gap-3">
                             <Toggle
                               checked={product.available}
-                              onChange={() => {
-                                setProducts(
-                                  products.map((item) =>
-                                    item.id === product.id
-                                      ? { ...item, available: !item.available }
-                                      : item,
-                                  ),
-                                );
-                              }}
+                              onChange={() =>
+                                handleToggleStatus(
+                                  product.id,
+                                  product.available,
+                                )
+                              }
                             />
                           </div>
                         </td>
