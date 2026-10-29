@@ -7,6 +7,8 @@ import SearchField from "../components/ui/SearchField";
 import Toggle from "../components/ui/Toggle";
 import AddProductModal from "../components/admin/AddProductModal";
 import EditProductModal from "../components/admin/EditProductModal";
+import WhatsappSettingsModal from "../components/admin/WhatsappSettingsModal";
+import CategoryManagementModal from "../components/admin/CategoryManagementModal";
 
 export default function AdminDashboard({
   products,
@@ -14,9 +16,13 @@ export default function AdminDashboard({
   onOpenCatalog,
   refreshProducts,
   currentUser,
+  categories = [],
+  refreshCategories,
   isLoading = false,
 }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [waModalOpen, setWaModalOpen] = useState(false);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [search, setSearch] = useState("");
 
@@ -83,9 +89,27 @@ export default function AdminDashboard({
                 Kelola produk dan status ketersediaan di katalog.
               </p>
             </div>
-            <Button className="h-12 px-5" onClick={() => setModalOpen(true)}>
-              <Icon name="plus" /> Tambah Produk Baru
-            </Button>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                className="h-12 px-4"
+                variant="secondary"
+                onClick={() => setCategoryModalOpen(true)}
+              >
+                <Icon name="tag" className="size-5 text-brand mr-1.5" />
+                <span>Kelola Kategori</span>
+              </Button>
+              <Button
+                className="h-12 px-4"
+                variant="secondary"
+                onClick={() => setWaModalOpen(true)}
+              >
+                <Icon name="whatsapp" className="size-5 text-emerald-600 mr-1.5" />
+                <span>Pengaturan WA</span>
+              </Button>
+              <Button className="h-12 px-5" onClick={() => setModalOpen(true)}>
+                <Icon name="plus" /> Tambah Produk Baru
+              </Button>
+            </div>
           </div>
 
           <div className="mt-8 overflow-hidden rounded-3xl border border-line bg-white shadow-sm">
@@ -300,23 +324,41 @@ export default function AdminDashboard({
 
       {modalOpen && (
         <AddProductModal
+          categories={categories}
           onClose={() => setModalOpen(false)}
           onSave={() => {
             setModalOpen(false);
             refreshProducts();
+            refreshCategories();
           }}
         />
       )}
 
       {editingProduct && (
         <EditProductModal
+          categories={categories}
           onClose={() => setEditingProduct(null)}
           onSave={() => {
             setEditingProduct(null);
             refreshProducts();
+            refreshCategories();
           }}
           product={editingProduct}
         />
+      )}
+
+      {categoryModalOpen && (
+        <CategoryManagementModal
+          onClose={() => setCategoryModalOpen(false)}
+          onCategoriesChanged={() => {
+            refreshCategories();
+            refreshProducts();
+          }}
+        />
+      )}
+
+      {waModalOpen && (
+        <WhatsappSettingsModal onClose={() => setWaModalOpen(false)} />
       )}
     </div>
   );

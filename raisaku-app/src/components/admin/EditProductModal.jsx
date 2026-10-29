@@ -3,7 +3,12 @@ import axios from "axios";
 import Icon from "../ui/Icon";
 import Button from "../ui/Button";
 
-export default function EditProductModal({ product, onClose, onSave }) {
+export default function EditProductModal({
+  product,
+  onClose,
+  onSave,
+  categories = [],
+}) {
   const [preview, setPreview] = useState(product?.image || "");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -13,10 +18,6 @@ export default function EditProductModal({ product, onClose, onSave }) {
 
     const formElement = event.currentTarget;
     const formData = new FormData(formElement);
-
-    const categoryName = formData.get("category");
-    const category_id = categoryName === "Abon" ? "1" : "2";
-    formData.set("category_id", category_id);
 
     const fileInput = formElement.querySelector('input[type="file"]');
     if (fileInput?.files && fileInput.files[0]) {
@@ -120,11 +121,21 @@ export default function EditProductModal({ product, onClose, onSave }) {
               <span className="mb-2 block text-sm font-bold">Kategori</span>
               <select
                 className="field w-full border p-3 rounded-xl bg-white"
-                defaultValue={product?.category}
-                name="category"
+                defaultValue={product?.category_id}
+                name="category_id"
+                required
               >
-                <option value="Abon">Abon</option>
-                <option value="Puding">Puding</option>
+                {categories.length === 0 ? (
+                  <option value="" disabled>
+                    Belum ada kategori
+                  </option>
+                ) : (
+                  categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))
+                )}
               </select>
             </label>
             <label className="sm:col-span-2">

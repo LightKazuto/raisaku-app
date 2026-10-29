@@ -19,7 +19,19 @@ export default function App() {
   });
 
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get("http://localhost:5001/api/categories");
+      if (response.data.success) {
+        setCategories(response.data.data);
+      }
+    } catch (error) {
+      console.error("Gagal mengambil data kategori:", error);
+    }
+  };
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -29,10 +41,8 @@ export default function App() {
       const formattedData = response.data.data.map((item) => ({
         id: item.id,
         name: item.name,
-        category:
-          item.category_id === 1 || item.category_id === "1"
-            ? "Abon"
-            : "Puding",
+        category_id: item.category_id,
+        category: item.category_name || "Lainnya",
         description: item.description,
         price: item.price,
         image: item.image,
@@ -41,7 +51,7 @@ export default function App() {
 
       setProducts(formattedData);
     } catch (error) {
-      console.error("Gagal mengambil data dari backend:", error);
+      console.error("Gagal mengambil data produk dari backend:", error);
     } finally {
       setIsLoading(false);
     }
@@ -49,6 +59,7 @@ export default function App() {
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, []);
 
   const handleLoginSuccess = (user) => {
@@ -80,6 +91,8 @@ export default function App() {
         products={products}
         setProducts={setProducts}
         refreshProducts={fetchProducts}
+        categories={categories}
+        refreshCategories={fetchCategories}
         isLoading={isLoading}
       />
     );
@@ -91,6 +104,7 @@ export default function App() {
         setView(localStorage.getItem("admin_token") ? "admin" : "login")
       }
       products={products}
+      categories={categories}
       isLoading={isLoading}
     />
   );

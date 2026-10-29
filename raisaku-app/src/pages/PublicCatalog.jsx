@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Brand from "../components/ui/Brand";
 import Button from "../components/ui/Button";
 import Icon from "../components/ui/Icon";
@@ -123,10 +123,29 @@ function ProductCard({ product, cartItem, onAddToCart, onUpdateQty }) {
   );
 }
 
-export default function PublicCatalog({ products, onOpenAdmin, isLoading = false }) {
+export default function PublicCatalog({
+  products,
+  categories = [],
+  onOpenAdmin,
+  isLoading = false,
+}) {
   const [category, setCategory] = useState("Semua");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const categoryList = useMemo(() => {
+    const list =
+      categories.length > 0
+        ? categories.map((c) => c.name)
+        : ["Abon", "Puding"];
+    return ["Semua", ...list];
+  }, [categories]);
+
+  useEffect(() => {
+    if (category !== "Semua" && !categoryList.includes(category)) {
+      setCategory("Semua");
+    }
+  }, [categoryList, category]);
 
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -224,9 +243,9 @@ export default function PublicCatalog({ products, onOpenAdmin, isLoading = false
       text += `${index + 1}. ${item.name} (${item.qty}x) - Rp${(item.price * item.qty).toLocaleString("id-ID")}\n`;
     });
     text += `\n*Total Belanja: Rp${totalPrice.toLocaleString("id-ID")}*\n\nMohon info ketersediaan dan pembayarannya ya. Terima kasih!`;
-    const waNumber = "628123456789";
+    const backendRedirectUrl = "http://localhost:5001/api/whatsapp/redirect";
     window.open(
-      `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`,
+      `${backendRedirectUrl}?text=${encodeURIComponent(text)}`,
       "_blank",
     );
   };
@@ -321,8 +340,8 @@ export default function PublicCatalog({ products, onOpenAdmin, isLoading = false
                 Pilih favoritmu
               </h2>
             </div>
-            <div className="flex w-fit rounded-2xl border border-line bg-white p-1.5 shadow-sm">
-              {["Semua", "Abon", "Puding"].map((item) => (
+            <div className="flex w-fit flex-wrap gap-1 rounded-2xl border border-line bg-white p-1.5 shadow-sm">
+              {categoryList.map((item) => (
                 <button
                   className={`rounded-xl px-5 py-2.5 text-sm font-bold transition ${category === item ? "bg-brand text-white shadow-sm" : "text-gray-500 hover:text-ink hover:bg-gray-50"}`}
                   key={item}

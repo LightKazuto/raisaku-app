@@ -3,17 +3,13 @@ import axios from "axios";
 import Icon from "../ui/Icon";
 import Button from "../ui/Button";
 
-export default function AddProductModal({ onClose, onSave }) {
+export default function AddProductModal({ onClose, onSave, categories = [] }) {
   const [preview, setPreview] = useState("");
 
   const submit = async (event) => {
     event.preventDefault();
     const formElement = event.currentTarget;
     const formData = new FormData(formElement);
-
-    const categoryName = formData.get("category");
-    const category_id = categoryName === "Abon" ? "1" : "2";
-    formData.append("category_id", category_id);
 
     const fileInput = formElement.querySelector('input[type="file"]');
     if (fileInput.files && fileInput.files[0]) {
@@ -103,10 +99,21 @@ export default function AddProductModal({ onClose, onSave }) {
               <span className="mb-2 block text-sm font-bold">Kategori</span>
               <select
                 className="field w-full border p-3 rounded-xl bg-white"
-                name="category"
+                name="category_id"
+                required
+                defaultValue={categories[0]?.id || ""}
               >
-                <option>Abon</option>
-                <option>Puding</option>
+                {categories.length === 0 ? (
+                  <option value="" disabled>
+                    Belum ada kategori
+                  </option>
+                ) : (
+                  categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))
+                )}
               </select>
             </label>
             <label className="sm:col-span-2">
