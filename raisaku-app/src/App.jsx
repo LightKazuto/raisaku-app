@@ -5,10 +5,24 @@ import AdminDashboard from "./pages/AdminDashboard";
 import LoginAdmin from "./pages/AdminLogin";
 
 export default function App() {
-  const [view, setView] = useState("catalog");
+  const [adminUser, setAdminUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("admin_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [view, setView] = useState(() => {
+    return localStorage.getItem("admin_token") ? "admin" : "catalog";
+  });
+
   const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchProducts = async () => {
+    setIsLoading(true);
     try {
       const response = await axios.get("http://localhost:5001/api/products");
 
@@ -23,12 +37,13 @@ export default function App() {
         price: item.price,
         image: item.image,
         available: item.is_available ?? true,
-        stock: item.qty || 0,
       }));
 
       setProducts(formattedData);
     } catch (error) {
       console.error("Gagal mengambil data dari backend:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -36,10 +51,22 @@ export default function App() {
     fetchProducts();
   }, []);
 
+  const handleLoginSuccess = (user) => {
+    setAdminUser(user);
+    setView("admin");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("admin_token");
+    localStorage.removeItem("admin_user");
+    setAdminUser(null);
+    setView("catalog");
+  };
+
   if (view === "login") {
     return (
       <LoginAdmin
-        onLoginSuccess={() => setView("admin")}
+        onLoginSuccess={handleLoginSuccess}
         onCancel={() => setView("catalog")}
       />
     );
@@ -48,15 +75,23 @@ export default function App() {
   if (view === "admin") {
     return (
       <AdminDashboard
-        onOpenCatalog={() => setView("catalog")}
+        onOpenCatalog={handleLogout}
+        currentUser={adminUser}
         products={products}
         setProducts={setProducts}
         refreshProducts={fetchProducts}
+        isLoading={isLoading}
       />
     );
   }
 
   return (
-    <PublicCatalog onOpenAdmin={() => setView("login")} products={products} />
+    <PublicCatalog
+      onOpenAdmin={() =>
+        setView(localStorage.getItem("admin_token") ? "admin" : "login")
+      }
+      products={products}
+      isLoading={isLoading}
+    />
   );
 }

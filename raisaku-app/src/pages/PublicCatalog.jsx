@@ -4,9 +4,129 @@ import Button from "../components/ui/Button";
 import Icon from "../components/ui/Icon";
 import SearchField from "../components/ui/SearchField";
 
-export default function PublicCatalog({ products, onOpenAdmin }) {
+function ProductCardSkeleton() {
+  return (
+    <div className="flex flex-col overflow-hidden rounded-3xl border border-line bg-white p-3 shadow-sm animate-pulse">
+      {/* Image Skeleton */}
+      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-gray-200" />
+
+      {/* Body Skeleton */}
+      <div className="flex flex-col flex-1 px-2 pb-2 pt-4">
+        {/* Title */}
+        <div className="h-5 bg-gray-200 rounded-lg w-3/4 mb-2.5" />
+
+        {/* Description */}
+        <div className="space-y-1.5 flex-1">
+          <div className="h-3.5 bg-gray-200 rounded w-full" />
+          <div className="h-3.5 bg-gray-200 rounded w-4/5" />
+        </div>
+
+        {/* Price & Action */}
+        <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
+          <div className="h-6 bg-gray-200 rounded-md w-24" />
+          <div className="h-9 bg-gray-200 rounded-xl w-24" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductCard({ product, cartItem, onAddToCart, onUpdateQty }) {
+  const isOutOfStock = !product.available;
+
+  return (
+    <article
+      className={`flex flex-col group overflow-hidden rounded-3xl border border-line bg-white p-3 shadow-sm transition ${
+        isOutOfStock
+          ? "opacity-75 bg-gray-50/70"
+          : "hover:shadow-md hover:border-brand/30"
+      }`}
+    >
+      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-gray-100">
+        <img
+          alt={product.name}
+          className={`h-full w-full object-cover transition duration-500 ${
+            isOutOfStock ? "grayscale-[20%]" : "group-hover:scale-105"
+          }`}
+          src={product.image}
+        />
+        <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-ink backdrop-blur">
+          {product.category}
+        </span>
+        {isOutOfStock && (
+          <span className="absolute inset-0 grid place-items-center bg-black/50 text-sm font-bold uppercase tracking-widest text-white backdrop-blur-sm">
+            Habis
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col flex-1 px-2 pb-2 pt-4">
+        <h3 className="text-lg font-extrabold text-ink">{product.name}</h3>
+        <p className="mt-2 line-clamp-2 text-sm leading-5 text-muted flex-1">
+          {product.description}
+        </p>
+        <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
+          <div>
+            <strong className="block text-lg text-brand">
+              Rp{product.price.toLocaleString("id-ID")}
+            </strong>
+          </div>
+
+          {isOutOfStock ? (
+            <button
+              type="button"
+              disabled
+              className="rounded-xl border border-line bg-gray-100 px-4 py-2 text-sm font-bold text-gray-400 cursor-not-allowed select-none opacity-80"
+            >
+              Habis
+            </button>
+          ) : cartItem ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onUpdateQty(product.id, -1)}
+                className={`flex size-8 items-center justify-center rounded-lg border font-bold transition ${
+                  cartItem.qty === 1
+                    ? "border-red-200 bg-red-50 text-red-500 hover:bg-red-100"
+                    : "border-line bg-surface hover:bg-gray-100 text-ink"
+                }`}
+                type="button"
+              >
+                {cartItem.qty === 1 ? (
+                  <Icon name="trash" className="size-4" />
+                ) : (
+                  "-"
+                )}
+              </button>
+
+              <span className="text-sm font-bold w-5 text-center">
+                {cartItem.qty}
+              </span>
+
+              <button
+                onClick={() => onUpdateQty(product.id, 1)}
+                className="flex size-8 items-center justify-center rounded-lg border font-bold transition border-brand bg-brand text-white hover:bg-brand-dark"
+                type="button"
+              >
+                +
+              </button>
+            </div>
+          ) : (
+            <Button
+              className="px-4 py-2 text-sm"
+              onClick={() => onAddToCart(product)}
+            >
+              + Tambah
+            </Button>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+export default function PublicCatalog({ products, onOpenAdmin, isLoading = false }) {
   const [category, setCategory] = useState("Semua");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -24,7 +144,23 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
     [category, products, search],
   );
 
+  const availableProducts = useMemo(
+    () => visibleProducts.filter((product) => product.available),
+    [visibleProducts],
+  );
+
+  const outOfStockProducts = useMemo(
+    () => visibleProducts.filter((product) => !product.available),
+    [visibleProducts],
+  );
+
   const addToCart = (product) => {
+    if (!product.available) {
+      setToastMsg(`Maaf, ${product.name} sedang tidak tersedia!`);
+      setTimeout(() => setToastMsg(null), 2000);
+      return;
+    }
+
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === product.id);
       if (existingItem) {
@@ -49,14 +185,16 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
       prevCart
         .map((item) => {
           if (item.id === id) {
-            const newQty = item.qty + delta;
+            const product = products.find((p) => p.id === id);
+            const isAvailable = product ? product.available : true;
 
-            if (delta > 0 && newQty > item.stock) {
-              setToastMsg(`Stok ${item.name} sisa ${item.stock} porsi`);
+            if (delta > 0 && !isAvailable) {
+              setToastMsg(`Maaf, ${item.name} sedang tidak tersedia`);
               setTimeout(() => setToastMsg(null), 2000);
               return item;
             }
 
+            const newQty = item.qty + delta;
             return { ...item, qty: newQty };
           }
           return item;
@@ -70,11 +208,22 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
 
   const checkoutToWhatsApp = () => {
     if (cart.length === 0) return;
+
+    const outOfStockItem = cart.find((item) => {
+      const p = products.find((prod) => prod.id === item.id);
+      return !p || !p.available;
+    });
+
+    if (outOfStockItem) {
+      alert(`Mohon kurangi/hapus "${outOfStockItem.name}" dari keranjang karena produk sedang tidak tersedia.`);
+      return;
+    }
+
     let text = "Halo *Raisaku*, saya ingin pesan:\n\n";
     cart.forEach((item, index) => {
       text += `${index + 1}. ${item.name} (${item.qty}x) - Rp${(item.price * item.qty).toLocaleString("id-ID")}\n`;
     });
-    text += `\n*Total Belanja: Rp${totalPrice.toLocaleString("id-ID")}*\n\nMohon info total ongkir dan pembayarannya ya. Terima kasih!`;
+    text += `\n*Total Belanja: Rp${totalPrice.toLocaleString("id-ID")}*\n\nMohon info ketersediaan dan pembayarannya ya. Terima kasih!`;
     const waNumber = "628123456789";
     window.open(
       `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`,
@@ -186,98 +335,150 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
             </div>
           </div>
 
-          <div className="mt-9 grid gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
-            {visibleProducts.map((product) => {
-              const cartItem = cart.find((item) => item.id === product.id);
-
-              return (
-                <article
-                  className="flex flex-col group overflow-hidden rounded-3xl border border-line bg-white p-3 shadow-sm transition hover:shadow-md hover:border-brand/30"
-                  key={product.id}
+          {/* Filter Status: Semua / Tersedia / Habis */}
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-muted mr-1">Status:</span>
+            {[
+              { id: "all", label: "Semua", count: visibleProducts.length },
+              { id: "available", label: "Tersedia", count: availableProducts.length },
+              { id: "outOfStock", label: "Habis", count: outOfStockProducts.length },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setStatusFilter(tab.id)}
+                className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                  statusFilter === tab.id
+                    ? "bg-ink text-white shadow-sm"
+                    : "bg-white border border-line text-muted hover:text-ink hover:border-gray-300"
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                    statusFilter === tab.id
+                      ? "bg-white/20 text-white"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
                 >
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-gray-100">
-                    <img
-                      alt={product.name}
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                      src={product.image}
-                    />
-                    <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1.5 text-xs font-bold text-ink backdrop-blur">
-                      {product.category}
-                    </span>
-                    {(!product.available || product.stock === 0) && (
-                      <span className="absolute inset-0 grid place-items-center bg-black/50 text-sm font-bold uppercase tracking-widest text-white backdrop-blur-sm">
-                        Habis
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Skeleton Loading State */}
+          {isLoading ? (
+            <div className="mt-9 space-y-6">
+              <div className="flex items-center gap-3">
+                <span className="flex size-3 rounded-full bg-gray-200 animate-pulse"></span>
+                <div className="h-6 w-36 bg-gray-200 rounded-lg animate-pulse" />
+              </div>
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+                {[...Array(6)].map((_, i) => (
+                  <ProductCardSkeleton key={i} />
+                ))}
+              </div>
+            </div>
+          ) : visibleProducts.length === 0 ? (
+            <div className="mt-12 rounded-3xl border border-line bg-white p-12 text-center shadow-sm">
+              <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
+                <Icon name="search" className="size-6" />
+              </div>
+              <h3 className="mt-4 text-lg font-bold text-ink">
+                Produk tidak ditemukan
+              </h3>
+              <p className="mt-1 text-sm text-muted">
+                Tidak ada menu yang sesuai dengan pencarian atau kategori ini.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-9 space-y-14">
+              {/* Bagian Produk Tersedia */}
+              {(statusFilter === "all" || statusFilter === "available") && (
+                <div>
+                  <div className="mb-6 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100"></span>
+                      <h3 className="text-xl font-extrabold text-ink md:text-2xl">
+                        Menu Tersedia
+                      </h3>
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
+                        {availableProducts.length} menu
                       </span>
-                    )}
-                  </div>
-                  <div className="flex flex-col flex-1 px-2 pb-2 pt-4">
-                    <h3 className="text-lg font-extrabold text-ink">
-                      {product.name}
-                    </h3>
-                    <p className="mt-2 line-clamp-2 text-sm leading-5 text-muted flex-1">
-                      {product.description}
-                    </p>
-                    <div className="mt-4 flex items-center justify-between border-t border-line pt-4">
-                      <div>
-                        <strong className="block text-lg text-brand">
-                          Rp{product.price.toLocaleString("id-ID")}
-                        </strong>
-                        {/* <span className="mt-0.5 block text-xs font-medium text-muted">
-                          Sisa stok:{" "}
-                          <span className="font-bold text-ink">
-                            {product.stock}
-                          </span>
-                        </span> */}
-                      </div>
-
-                      {cartItem ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => updateQty(product.id, -1)}
-                            className={`flex size-8 items-center justify-center rounded-lg border font-bold transition ${
-                              cartItem.qty === 1
-                                ? "border-red-200 bg-red-50 text-red-500 hover:bg-red-100"
-                                : "border-line bg-surface hover:bg-gray-100 text-ink"
-                            }`}
-                          >
-                            {cartItem.qty === 1 ? (
-                              <Icon name="trash" className="size-4" />
-                            ) : (
-                              "-"
-                            )}
-                          </button>
-
-                          <span className="text-sm font-bold w-5 text-center">
-                            {cartItem.qty}
-                          </span>
-
-                          <button
-                            onClick={() => updateQty(product.id, 1)}
-                            disabled={cartItem.qty >= product.stock}
-                            className={`flex size-8 items-center justify-center rounded-lg border font-bold transition ${
-                              cartItem.qty >= product.stock
-                                ? "border-line bg-gray-100 text-gray-400 cursor-not-allowed"
-                                : "border-brand bg-brand text-white hover:bg-brand-dark"
-                            }`}
-                          >
-                            +
-                          </button>
-                        </div>
-                      ) : (
-                        <Button
-                          className="px-4 py-2 text-sm"
-                          onClick={() => addToCart(product)}
-                          disabled={!product.available || product.stock === 0}
-                        >
-                          {product.stock === 0 ? "Habis" : "+ Tambah"}
-                        </Button>
-                      )}
                     </div>
                   </div>
-                </article>
-              );
-            })}
-          </div>
+
+                  {availableProducts.length > 0 ? (
+                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+                      {availableProducts.map((product) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          cartItem={cart.find((item) => item.id === product.id)}
+                          onAddToCart={addToCart}
+                          onUpdateQty={updateQty}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-line bg-white p-8 text-center text-muted">
+                      <p className="text-sm font-semibold">
+                        Saat ini belum ada menu yang tersedia untuk pilihan ini.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Bagian Produk Habis */}
+              {((statusFilter === "all" && outOfStockProducts.length > 0) ||
+                statusFilter === "outOfStock") && (
+                <div
+                  className={
+                    statusFilter === "all" && availableProducts.length > 0
+                      ? "pt-12 border-t border-line/80"
+                      : ""
+                  }
+                >
+                  <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-3 rounded-full bg-rose-500 ring-4 ring-rose-100"></span>
+                      <h3 className="text-xl font-extrabold text-ink md:text-2xl">
+                        Stok Habis
+                      </h3>
+                      <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700 border border-rose-200">
+                        {outOfStockProducts.length} menu
+                      </span>
+                    </div>
+                    <p className="text-xs font-medium text-muted">
+                      Menu sedang tidak tersedia sementara
+                    </p>
+                  </div>
+
+                  {outOfStockProducts.length > 0 ? (
+                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+                      {outOfStockProducts.map((product) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          cartItem={cart.find((item) => item.id === product.id)}
+                          onAddToCart={addToCart}
+                          onUpdateQty={updateQty}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-line bg-white p-8 text-center text-muted">
+                      <p className="text-sm font-semibold">
+                        Tidak ada menu yang habis. Semua produk siap dipesan!
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         <footer className="border-t border-line mt-10 py-8 text-center">
@@ -316,6 +517,7 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
         </div>
       )}
 
+      {/* Drawer Keranjang Belanja */}
       <div
         className={`fixed inset-0 z-50 overflow-hidden transition-all duration-300 ${isCartOpen ? "visible" : "invisible"}`}
       >
@@ -328,7 +530,14 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
         >
           <div className="flex h-full w-full flex-col bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-line px-6 py-5">
-              <h2 className="text-xl font-extrabold">Keranjang Pesanan</h2>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-xl font-extrabold">Keranjang Pesanan</h2>
+                {totalItems > 0 && (
+                  <span className="rounded-full bg-brand-soft px-2.5 py-0.5 text-xs font-extrabold text-brand">
+                    {totalItems} item
+                  </span>
+                )}
+              </div>
               <button
                 onClick={() => setIsCartOpen(false)}
                 className="rounded-full p-2 hover:bg-gray-100 text-muted transition"
@@ -336,6 +545,7 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
                 <Icon name="close" className="size-5" />
               </button>
             </div>
+
             <div className="flex-1 overflow-y-auto p-6">
               {cart.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center text-muted">
@@ -359,67 +569,79 @@ export default function PublicCatalog({ products, onOpenAdmin }) {
                 </div>
               ) : (
                 <ul className="divide-y divide-line">
-                  {cart.map((item) => (
-                    <li key={item.id} className="flex py-5 gap-4">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="size-16 rounded-xl object-cover border border-line"
-                      />
-                      <div className="flex flex-1 flex-col justify-between">
-                        <div>
-                          <h3 className="font-bold text-ink text-sm leading-tight">
-                            {item.name}
-                          </h3>
-                          <p className="text-brand font-bold text-sm mt-1">
-                            Rp{item.price.toLocaleString("id-ID")}
+                  {cart.map((item) => {
+                    const currentProduct = products.find((p) => p.id === item.id);
+                    const isOutOfStock = !currentProduct || !currentProduct.available;
+
+                    return (
+                      <li key={item.id} className="flex py-5 gap-4">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="size-16 rounded-xl object-cover border border-line shrink-0"
+                        />
+                        <div className="flex flex-1 flex-col justify-between min-w-0">
+                          <div>
+                            <h3 className="font-bold text-ink text-sm leading-tight truncate">
+                              {item.name}
+                            </h3>
+                            <p className="text-brand font-bold text-sm mt-1">
+                              Rp{item.price.toLocaleString("id-ID")}
+                            </p>
+                            {isOutOfStock && (
+                              <span className="inline-block mt-1 text-[11px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                                Nonaktif
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-3">
+                            <button
+                              onClick={() => updateQty(item.id, -1)}
+                              className="flex size-7 items-center justify-center rounded-lg border border-line bg-gray-50 hover:bg-gray-100 font-bold text-ink text-sm transition"
+                            >
+                              -
+                            </button>
+                            <span className="text-sm font-bold w-4 text-center">
+                              {item.qty}
+                            </span>
+                            <button
+                              onClick={() => updateQty(item.id, 1)}
+                              disabled={isOutOfStock}
+                              className={`flex size-7 items-center justify-center rounded-lg border font-bold transition text-sm ${
+                                isOutOfStock
+                                  ? "border-line bg-gray-100 text-gray-300 cursor-not-allowed"
+                                  : "border-line bg-gray-50 hover:bg-gray-200 text-ink"
+                              }`}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-extrabold text-ink text-sm">
+                            Rp{(item.price * item.qty).toLocaleString("id-ID")}
                           </p>
                         </div>
-                        <div className="flex items-center gap-3 mt-3">
-                          <button
-                            onClick={() => updateQty(item.id, -1)}
-                            className="flex size-7 items-center justify-center rounded-lg border border-line bg-gray-50 hover:bg-gray-100 font-bold text-ink"
-                          >
-                            -
-                          </button>
-                          <span className="text-sm font-bold w-4 text-center">
-                            {item.qty}
-                          </span>
-                          <button
-                            onClick={() => updateQty(item.id, 1)}
-                            disabled={item.qty >= item.stock}
-                            className={`flex size-7 items-center justify-center rounded-lg border font-bold transition ${
-                              item.qty >= item.stock
-                                ? "border-line bg-gray-100 text-gray-300 cursor-not-allowed"
-                                : "border-line bg-gray-50 hover:bg-gray-200 text-ink"
-                            }`}
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-extrabold text-ink text-sm">
-                          Rp{(item.price * item.qty).toLocaleString("id-ID")}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
+
             {cart.length > 0 && (
               <div className="border-t border-line bg-gray-50 p-6">
                 <div className="flex justify-between text-base font-bold text-ink mb-5">
                   <p>Total Belanja</p>
-                  <p>Rp{totalPrice.toLocaleString("id-ID")}</p>
+                  <p className="text-lg text-brand font-extrabold">
+                    Rp{totalPrice.toLocaleString("id-ID")}
+                  </p>
                 </div>
                 <Button
                   className="w-full h-14 text-base"
                   onClick={checkoutToWhatsApp}
                 >
-                  <Icon name="whatsapp" className="size-5" /> Pesan Sekarang via
-                  WA
+                  <Icon name="whatsapp" className="size-5" /> Pesan Sekarang via WA
                 </Button>
               </div>
             )}
